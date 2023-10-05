@@ -123,9 +123,9 @@ class CLG{
             }
         }
         
-        cout << "L: " << L << "\ninitialN: " << initialN << "\nmax move tries: " << max_move_tries << "\nmax num moves: " << max_num_moves << "\n\
+        /*cout << "L: " << L << "\ninitialN: " << initialN << "\nmax move tries: " << max_move_tries << "\nmax num moves: " << max_num_moves << "\n\
 generate exact n: " << generate_exact_n << "\nprint step headers: " << print_step_headers << "\nuse fixed seed: " << use_fixed_seed << "\n\
-print initial lattice: " << print_initial_lattice << "\nprint execution time: " << print_execution_time << endl;
+print initial lattice: " << print_initial_lattice << "\nprint execution time: " << print_execution_time << endl;*/
         return 0;
     }
 
@@ -140,7 +140,7 @@ print initial lattice: " << print_initial_lattice << "\nprint execution time: " 
 
 
     float generateLattice(float P = 0.5){
-        float generationPercent = ((P - 0.5)*2) ;  
+        float generationPercent = ((P - 0.5)*2);
         //cout << "Generation percent: " << generationPercent << endl;
         bool previous_site_val = true;  // used to track 11 pairs and find edges
         lattice.push_back(true);
@@ -161,7 +161,7 @@ print initial lattice: " << print_initial_lattice << "\nprint execution time: " 
                 N++;
             }else{
             	//cout << rand_n % 10 << endl;
-                if(generationPercent * 10 > (rand_n % 10)){ //in order to compare need to multiply by generationPercent by 10 in order to have correct comparison
+                if(generationPercent * 10000 > (rand_n % 10000)){ //in order to compare need to multiply by generationPercent by 10 in order to have correct comparison
                     lattice.push_back(true);
                     previous_site_val = true;  //line can be removed
                     N++;
@@ -182,7 +182,7 @@ print initial lattice: " << print_initial_lattice << "\nprint execution time: " 
         } 
         
         lattice.shrink_to_fit();    //done adding, so free memory if able. NON-BINDING, INTERNAL IMPLEMENTATION DEPENDENT
-        //cout << "Lattice generated: " << endl;
+        
         return generationPercent;
     }
 
@@ -294,7 +294,7 @@ print initial lattice: " << print_initial_lattice << "\nprint execution time: " 
             int ind = -1;
             for(int i = 0; i < max_move_tries; i++){
                 ind = rand() % lattice.size();
-                if(lattice[(ind-1) % lattice.size()] && lattice[ind] && lattice[(ind+1) % lattice.size()]){ //tests to see if ind and ind +- 1 are occupied, so ind can be removed
+                if(lattice[(ind + lattice.size() - 1) % lattice.size()] && lattice[ind] && lattice[(ind+1) % lattice.size()]){ //tests to see if ind and ind +- 1 are occupied, so ind can be removed
                     lattice[ind] = false;
                     N11pairs -= 2;
                     empty_sites.push_back(ind); //the sites are not ordered with i/d
@@ -304,6 +304,25 @@ print initial lattice: " << print_initial_lattice << "\nprint execution time: " 
         }
 
         return false;
+    }
+
+
+
+    int getNumActiveSites(){
+        int active_site_count = 0;
+        for (int i = 0; i < empty_sites.size(); i++){
+            int ind = empty_sites[i];
+
+            //check left
+            if(lattice[(ind + lattice.size() - 1) % lattice.size()] && lattice[(ind + lattice.size() - 2) % lattice.size()]){
+                active_site_count++;
+            }
+            //check right
+            if(lattice[(ind + 1) % lattice.size()] && lattice[(ind + 2) % lattice.size()]){
+                active_site_count++;
+            }
+        }
+        return active_site_count;
     }
 
 
@@ -432,7 +451,7 @@ int main(int argc, char * argv[]){
             return 0;   //want to exit the program, not run it if someone asks for help
         }
         if(var_map.count("version")){
-            cout << "Version is: 1.0.8, updated 9/28/23\n";
+            cout << "Version is: 1.0.9, updated 10/4/23\n";
             return 0;
         }
         if(var_map.count("input-file")){ 
@@ -443,7 +462,8 @@ int main(int argc, char * argv[]){
         const auto start_generation_timestamp = std::chrono::steady_clock::now();CLG sim = CLG(var_map);
     
 
-        sim.generateLattice(sim.generationProbability);
+        int gp = sim.generateLattice(sim.generationProbability);
+        //cout << "GP: " << gp << ". GenProp: " << sim.generationProbability << endl;
 
         const auto end_generation_timestamp = std::chrono::steady_clock::now();  
         if(sim.getprint_execution_time()){
@@ -453,22 +473,26 @@ int main(int argc, char * argv[]){
         //print lattice before moves are made
         if(sim.getprint_initial_lattice()){
             sim.printArray(sim.lattice);
-            cout << "\tN: " << sim.getN() << " N11s: " << sim.getNPairs().first << " N00s: " << sim.getNPairs().second << endl;
+            cout << "N: " << sim.getN() << " N11s: " << sim.getNPairs().first << " N00s: " << sim.getNPairs().second << endl;
             sim.printEmptySites();
         }else{
-            cout << "\tN: " << sim.getN() << " N11s: " << sim.getNPairs().first << endl << "N00s: " << sim.getNPairs().second << endl;
+            cout << "N: " << sim.getN() << " N11s: " << sim.getNPairs().first << " N00s: " << sim.getNPairs().second << endl;
         }
         
         //timing total time to make moves
         const auto start_move_timestamp = std::chrono::steady_clock::now();
         int actual_moves = sim.move();
         const auto end_move_timestamp = std::chrono::steady_clock::now();
-    
+
+        
+
         //print move execution time
         if(sim.getprint_execution_time()){
             cout << float(std::chrono::duration_cast<std::chrono::milliseconds>(end_move_timestamp - start_move_timestamp).count()) / 1000 << " seconds of runtime for all moves" << endl;
         }
-    
+        int active_sites = sim.getNumActiveSites();
+        cout << "Number of active sites: " << active_sites << " Pa: " << float(active_sites)/sim.lattice.size() << " with N/L ratio: " << float(sim.getN())/sim.lattice.size() << endl;
+
         
         //logging: to be added later
     
